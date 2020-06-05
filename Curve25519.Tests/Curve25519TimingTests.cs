@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿#pragma warning disable IDE0007 // Use implicit type
+#pragma warning disable IDE0059 // Unnecessary assignment of a value
+
+using System.Collections.Generic;
 using System.Diagnostics;
 using Xunit;
 
@@ -10,13 +13,13 @@ namespace Elliptic.Tests
 		public void Curve25519_GetPublicKey()
 		{
 			var ticks = new List<long>();
-			for (int i = 0; i < 255; i++)
+			for (byte b = 0; b < 255; b++)
 			{
 				var stopwatch = Stopwatch.StartNew();
 
-				byte[] privateKey = Curve25519.ClampPrivateKey(TestHelpers.GetUniformBytes((byte)i, 32));
+				byte[] privateKey = Curve25519.ClampPrivateKey(TestHelpers.GetUniformBytes(b, 32));
 
-				for (int j = 0; j < 1000; j++)
+				for (int i = 0; i < 1000; i++)
 				{
 					byte[] publicKey = Curve25519.GetPublicKey(privateKey); // IDE0059 - Unnecessary assignment of a value
 				}

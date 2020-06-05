@@ -1,4 +1,6 @@
-﻿using System;
+﻿#pragma warning disable IDE0007 // Use implicit type
+
+using System;
 using Xunit;
 
 namespace Elliptic.Tests
