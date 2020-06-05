@@ -11,6 +11,12 @@
  * Based on work by Daniel J Bernstein, http://cr.yp.to/ecdh.html
  */
 
+//#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
+#pragma warning disable IDE0007 // Use implicit type
+//#pragma warning disable IDE0022 // Use expression body for methods
+//#pragma warning disable IDE0047 // Remove unnecessary parentheses
+//#pragma warning disable IDE0049 // Simplify Names
+
 using System;
 using System.Security.Cryptography;
 
@@ -43,7 +49,7 @@ namespace Elliptic
 		public static void ClampPrivateKeyInline(byte[] key)
 		{
 			if (key == null) throw new ArgumentNullException("key");
-			if (key.Length != 32) throw new ArgumentException(String.Format("key must be 32 bytes long (but was {0} bytes long)", key.Length));
+			if (key.Length != 32) throw new ArgumentException($"key must be 32 bytes long (but was {key.Length} bytes long)");
 
 			key[31] &= 0x7F;
 			key[31] |= 0x40;
@@ -57,7 +63,7 @@ namespace Elliptic
 		public static byte[] ClampPrivateKey(byte[] rawKey)
 		{
 			if (rawKey == null) throw new ArgumentNullException("rawKey");
-			if (rawKey.Length != 32) throw new ArgumentException(String.Format("rawKey must be 32 bytes long (but was {0} bytes long)", rawKey.Length), "rawKey");
+			if (rawKey.Length != 32) throw new ArgumentException($"rawKey must be 32 bytes long (but was {rawKey.Length} bytes long)", "rawKey");
 
 			var res = new byte[32];
 			Array.Copy(rawKey, res, 32);
@@ -76,7 +82,8 @@ namespace Elliptic
 		public static byte[] CreateRandomPrivateKey()
 		{
 			var privateKey = new byte[32];
-			RNGCryptoServiceProvider.Create().GetBytes(privateKey);
+			RandomNumberGenerator.Create().GetBytes(privateKey);
+			//RNGCryptoServiceProvider.Create().GetBytes(privateKey);
 			ClampPrivateKeyInline(privateKey);
 
 			return privateKey;
@@ -92,15 +99,17 @@ namespace Elliptic
 		public static void KeyGenInline(byte[] publicKey, byte[] signingKey, byte[] privateKey)
 		{
 			if (publicKey == null) throw new ArgumentNullException("publicKey");
-			if (publicKey.Length != 32) throw new ArgumentException(String.Format("publicKey must be 32 bytes long (but was {0} bytes long)", publicKey.Length), "publicKey");
+			if (publicKey.Length != 32) throw new ArgumentException($"publicKey must be 32 bytes long (but was {publicKey.Length} bytes long)", "publicKey");
 
 			if (signingKey == null) throw new ArgumentNullException("signingKey");
-			if (signingKey.Length != 32) throw new ArgumentException(String.Format("signingKey must be 32 bytes long (but was {0} bytes long)", signingKey.Length), "signingKey");
+			if (signingKey.Length != 32) throw new ArgumentException($"signingKey must be 32 bytes long (but was {signingKey.Length} bytes long)", "signingKey");
 
 			if (privateKey == null) throw new ArgumentNullException("privateKey");
-			if (privateKey.Length != 32) throw new ArgumentException(String.Format("privateKey must be 32 bytes long (but was {0} bytes long)", privateKey.Length), "privateKey");
+			if (privateKey.Length != 32) throw new ArgumentException($"privateKey must be 32 bytes long (but was {privateKey.Length} bytes long)", "privateKey");
 
-			RNGCryptoServiceProvider.Create().GetBytes(privateKey);
+			RandomNumberGenerator.Create().GetBytes(privateKey); 
+			//RNGCryptoServiceProvider.Create().GetBytes(privateKey);
+			
 			ClampPrivateKeyInline(privateKey);
 
 			Core(publicKey, signingKey, privateKey, null);
@@ -160,16 +169,8 @@ namespace Elliptic
 				long n0, long n1, long n2, long n3, long n4,
 				long n5, long n6, long n7, long n8, long n9)
 			{
-				N0 = n0;
-				N1 = n1;
-				N2 = n2;
-				N3 = n3;
-				N4 = n4;
-				N5 = n5;
-				N6 = n6;
-				N7 = n7;
-				N8 = n8;
-				N9 = n9;
+				N0 = n0; N1 = n1; N2 = n2; N3 = n3; N4 = n4;
+				N5 = n5; N6 = n6; N7 = n7; N8 = n8; N9 = n9;
 			}
 
 			public long N0, N1, N2, N3, N4, N5, N6, N7, N8, N9;
@@ -177,10 +178,7 @@ namespace Elliptic
 
 		/********************* radix 2^8 math *********************/
 
-		static void Copy32(byte[] source, byte[] destination)
-		{
-			Array.Copy(source, 0, destination, 0, 32);
-		}
+		static void Copy32(byte[] source, byte[] destination) => Array.Copy(source, 0, destination, 0, 32);
 
 		/* p[m..n+m-1] = q[m..n+m-1] + z * x */
 		/* n is the size of x */
@@ -226,23 +224,23 @@ namespace Elliptic
 		static void DivMod(byte[] q, byte[] r, int n, byte[] d, int t)
 		{
 			int rn = 0;
-			int dt = ((d[t - 1] & 0xFF) << 8);
+			int dt = (d[t - 1] & 0xFF) << 8;
 			if (t > 1)
 			{
-				dt |= (d[t - 2] & 0xFF);
+				dt |= d[t - 2] & 0xFF;
 			}
 			while (n-- >= t)
 			{
 				int z = (rn << 16) | ((r[n] & 0xFF) << 8);
 				if (n > 0)
 				{
-					z |= (r[n - 1] & 0xFF);
+					z |= r[n - 1] & 0xFF;
 				}
 				z /= dt;
 				rn += MultiplyArraySmall(r, r, n - t + 1, d, t, -z);
 				q[n - t + 1] = (byte)((z + rn) & 0xFF); /* rn is 0 or -1 (underflow) */
 				MultiplyArraySmall(r, r, n - t + 1, d, t, -rn);
-				rn = (r[n] & 0xFF);
+				rn = r[n] & 0xFF;
 				r[n] = 0;
 			}
 			r[t - 1] = (byte)rn;
@@ -303,39 +301,34 @@ namespace Elliptic
 
 		static void Unpack(Long10 x, byte[] m)
 		{
-			x.N0 = ((m[0] & 0xFF)) | ((m[1] & 0xFF)) << 8 |
-				   (m[2] & 0xFF) << 16 | ((m[3] & 0xFF) & 3) << 24;
-			x.N1 = ((m[3] & 0xFF) & ~3) >> 2 | (m[4] & 0xFF) << 6 |
-				   (m[5] & 0xFF) << 14 | ((m[6] & 0xFF) & 7) << 22;
-			x.N2 = ((m[6] & 0xFF) & ~7) >> 3 | (m[7] & 0xFF) << 5 |
-				   (m[8] & 0xFF) << 13 | ((m[9] & 0xFF) & 31) << 21;
-			x.N3 = ((m[9] & 0xFF) & ~31) >> 5 | (m[10] & 0xFF) << 3 |
-				   (m[11] & 0xFF) << 11 | ((m[12] & 0xFF) & 63) << 19;
-			x.N4 = ((m[12] & 0xFF) & ~63) >> 6 | (m[13] & 0xFF) << 2 |
+			x.N0 = (m[0] & 0xFF) | (m[1] & 0xFF) << 8 |
+				   (m[2] & 0xFF) << 16 | (m[3] & 0xFF & 3) << 24;
+			x.N1 = (m[3] & 0xFF & ~3) >> 2 | (m[4] & 0xFF) << 6 |
+				   (m[5] & 0xFF) << 14 | (m[6] & 0xFF & 7) << 22;
+			x.N2 = (m[6] & 0xFF & ~7) >> 3 | (m[7] & 0xFF) << 5 |
+				   (m[8] & 0xFF) << 13 | (m[9] & 0xFF & 31) << 21;
+			x.N3 = (m[9] & 0xFF & ~31) >> 5 | (m[10] & 0xFF) << 3 |
+				   (m[11] & 0xFF) << 11 | (m[12] & 0xFF & 63) << 19;
+			x.N4 = (m[12] & 0xFF & ~63) >> 6 | (m[13] & 0xFF) << 2 |
 				   (m[14] & 0xFF) << 10 | (m[15] & 0xFF) << 18;
 			x.N5 = (m[16] & 0xFF) | (m[17] & 0xFF) << 8 |
-				   (m[18] & 0xFF) << 16 | ((m[19] & 0xFF) & 1) << 24;
-			x.N6 = ((m[19] & 0xFF) & ~1) >> 1 | (m[20] & 0xFF) << 7 |
-				   (m[21] & 0xFF) << 15 | ((m[22] & 0xFF) & 7) << 23;
-			x.N7 = ((m[22] & 0xFF) & ~7) >> 3 | (m[23] & 0xFF) << 5 |
-				   (m[24] & 0xFF) << 13 | ((m[25] & 0xFF) & 15) << 21;
-			x.N8 = ((m[25] & 0xFF) & ~15) >> 4 | (m[26] & 0xFF) << 4 |
-				   (m[27] & 0xFF) << 12 | ((m[28] & 0xFF) & 63) << 20;
-			x.N9 = ((m[28] & 0xFF) & ~63) >> 6 | (m[29] & 0xFF) << 2 |
+				   (m[18] & 0xFF) << 16 | (m[19] & 0xFF & 1) << 24;
+			x.N6 = (m[19] & 0xFF & ~1) >> 1 | (m[20] & 0xFF) << 7 |
+				   (m[21] & 0xFF) << 15 | (m[22] & 0xFF & 7) << 23;
+			x.N7 = (m[22] & 0xFF & ~7) >> 3 | (m[23] & 0xFF) << 5 |
+				   (m[24] & 0xFF) << 13 | (m[25] & 0xFF & 15) << 21;
+			x.N8 = (m[25] & 0xFF & ~15) >> 4 | (m[26] & 0xFF) << 4 |
+				   (m[27] & 0xFF) << 12 | (m[28] & 0xFF & 63) << 20;
+			x.N9 = (m[28] & 0xFF & ~63) >> 6 | (m[29] & 0xFF) << 2 |
 				   (m[30] & 0xFF) << 10 | (m[31] & 0xFF) << 18;
 		}
 
 		/// <summary>
 		/// Check if reduced-form input >= 2^255-19
 		/// </summary>
-		static bool IsOverflow(Long10 x)
-		{
-			return (
-				((x.N0 > P26 - 19)) &
-				((x.N1 & x.N3 & x.N5 & x.N7 & x.N9) == P25) &
-				((x.N2 & x.N4 & x.N6 & x.N8) == P26)
-				) || (x.N9 > P25);
-		}
+		static bool IsOverflow(Long10 x) => ((x.N0 > P26 - 19) &
+											 ((x.N1 & x.N3 & x.N5 & x.N7 & x.N9) == P25) &
+											 ((x.N2 & x.N4 & x.N6 & x.N8) == P26)) || (x.N9 > P25);
 
 		/* Convert from internal format to little-endian byte format.  The 
 		 * number must be in a reduced form which is output by the following ops:
@@ -462,29 +455,19 @@ namespace Elliptic
 		/// </summary>
 		static void MulSmall(Long10 xy, Long10 x, long y)
 		{
-			long temp = (x.N8 * y);
-			xy.N8 = (temp & ((1 << 26) - 1));
-			temp = (temp >> 26) + (x.N9 * y);
-			xy.N9 = (temp & ((1 << 25) - 1));
-			temp = 19 * (temp >> 25) + (x.N0 * y);
-			xy.N0 = (temp & ((1 << 26) - 1));
-			temp = (temp >> 26) + (x.N1 * y);
-			xy.N1 = (temp & ((1 << 25) - 1));
-			temp = (temp >> 25) + (x.N2 * y);
-			xy.N2 = (temp & ((1 << 26) - 1));
-			temp = (temp >> 26) + (x.N3 * y);
-			xy.N3 = (temp & ((1 << 25) - 1));
-			temp = (temp >> 25) + (x.N4 * y);
-			xy.N4 = (temp & ((1 << 26) - 1));
-			temp = (temp >> 26) + (x.N5 * y);
-			xy.N5 = (temp & ((1 << 25) - 1));
-			temp = (temp >> 25) + (x.N6 * y);
-			xy.N6 = (temp & ((1 << 26) - 1));
-			temp = (temp >> 26) + (x.N7 * y);
-			xy.N7 = (temp & ((1 << 25) - 1));
-			temp = (temp >> 25) + xy.N8;
-			xy.N8 = (temp & ((1 << 26) - 1));
-			xy.N9 += (temp >> 26);
+			long temp = x.N8 * y;
+			xy.N8 = temp & ((1 << 26) - 1); temp = (temp >> 26) + x.N9 * y;
+			xy.N9 = temp & ((1 << 25) - 1); temp = 19 * (temp >> 25) + x.N0 * y;
+			xy.N0 = temp & ((1 << 26) - 1); temp = (temp >> 26) + x.N1 * y;
+			xy.N1 = temp & ((1 << 25) - 1); temp = (temp >> 25) + x.N2 * y;
+			xy.N2 = temp & ((1 << 26) - 1); temp = (temp >> 26) + x.N3 * y;
+			xy.N3 = temp & ((1 << 25) - 1); temp = (temp >> 25) + x.N4 * y;
+			xy.N4 = temp & ((1 << 26) - 1); temp = (temp >> 26) + x.N5 * y;
+			xy.N5 = temp & ((1 << 25) - 1); temp = (temp >> 25) + x.N6 * y;
+			xy.N6 = temp & ((1 << 26) - 1); temp = (temp >> 26) + x.N7 * y;
+			xy.N7 = temp & ((1 << 25) - 1); temp = (temp >> 25) + xy.N8;
+			xy.N8 = temp & ((1 << 26) - 1);
+			xy.N9 += temp >> 26;
 		}
 
 		/// <summary>
@@ -497,81 +480,36 @@ namespace Elliptic
 			 * This seem to improve performance a bit...
 			 */
 			long
-				x0 = x.N0,
-				x1 = x.N1,
-				x2 = x.N2,
-				x3 = x.N3,
-				x4 = x.N4,
-				x5 = x.N5,
-				x6 = x.N6,
-				x7 = x.N7,
-				x8 = x.N8,
-				x9 = x.N9;
+				x0 = x.N0, x1 = x.N1, x2 = x.N2, x3 = x.N3, x4 = x.N4,
+				x5 = x.N5, x6 = x.N6, x7 = x.N7, x8 = x.N8, x9 = x.N9;
 			long
-				y0 = y.N0,
-				y1 = y.N1,
-				y2 = y.N2,
-				y3 = y.N3,
-				y4 = y.N4,
-				y5 = y.N5,
-				y6 = y.N6,
-				y7 = y.N7,
-				y8 = y.N8,
-				y9 = y.N9;
+				y0 = y.N0, y1 = y.N1, y2 = y.N2, y3 = y.N3, y4 = y.N4,
+				y5 = y.N5, y6 = y.N6, y7 = y.N7, y8 = y.N8, y9 = y.N9;
 			long
-				t = (x0*y8) + (x2*y6) + (x4*y4) + (x6*y2) +
-					(x8*y0) + 2*((x1*y7) + (x3*y5) +
-								 (x5*y3) + (x7*y1)) + 38*
-					(x9*y9);
-			xy.N8 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + (x0 * y9) + (x1 * y8) + (x2 * y7) +
-				(x3 * y6) + (x4 * y5) + (x5 * y4) +
-				(x6 * y3) + (x7 * y2) + (x8 * y1) +
-				(x9 * y0);
-			xy.N9 = (t & ((1 << 25) - 1));
-			t = (x0 * y0) + 19 * ((t >> 25) + (x2 * y8) + (x4 * y6)
-								+ (x6 * y4) + (x8 * y2)) + 38 *
-				((x1 * y9) + (x3 * y7) + (x5 * y5) +
-				 (x7 * y3) + (x9 * y1));
-			xy.N0 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + (x0 * y1) + (x1 * y0) + 19 * ((x2 * y9)
-														+ (x3 * y8) + (x4 * y7) + (x5 * y6) +
-														(x6 * y5) + (x7 * y4) + (x8 * y3) +
-														(x9 * y2));
-			xy.N1 = (t & ((1 << 25) - 1));
-			t = (t >> 25) + (x0 * y2) + (x2 * y0) + 19 * ((x4 * y8)
-														+ (x6 * y6) + (x8 * y4)) + 2 * (x1 * y1)
-				+ 38 * ((x3 * y9) + (x5 * y7) +
-					  (x7 * y5) + (x9 * y3));
-			xy.N2 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + (x0 * y3) + (x1 * y2) + (x2 * y1) +
-				(x3 * y0) + 19 * ((x4 * y9) + (x5 * y8) +
-								(x6 * y7) + (x7 * y6) +
-								(x8 * y5) + (x9 * y4));
-			xy.N3 = (t & ((1 << 25) - 1));
-			t = (t >> 25) + (x0 * y4) + (x2 * y2) + (x4 * y0) + 19 *
-				((x6 * y8) + (x8 * y6)) + 2 * ((x1 * y3) +
-											 (x3 * y1)) + 38 *
-				((x5 * y9) + (x7 * y7) + (x9 * y5));
-			xy.N4 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + (x0 * y5) + (x1 * y4) + (x2 * y3) +
-				(x3 * y2) + (x4 * y1) + (x5 * y0) + 19 *
-				((x6 * y9) + (x7 * y8) + (x8 * y7) +
-				 (x9 * y6));
-			xy.N5 = (t & ((1 << 25) - 1));
-			t = (t >> 25) + (x0 * y6) + (x2 * y4) + (x4 * y2) +
-				(x6 * y0) + 19 * (x8 * y8) + 2 * ((x1 * y5) +
-											  (x3 * y3) + (x5 * y1)) + 38 *
-				((x7 * y9) + (x9 * y7));
-			xy.N6 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + (x0 * y7) + (x1 * y6) + (x2 * y5) +
-				(x3 * y4) + (x4 * y3) + (x5 * y2) +
-				(x6 * y1) + (x7 * y0) + 19 * ((x8 * y9) +
-											(x9 * y8));
-			xy.N7 = (t & ((1 << 25) - 1));
+				t = x0 * y8 + x2 * y6 + x4 * y4 + x6 * y2 + x8 * y0 + 2 * (x1 * y7 + x3 * y5 + x5 * y3 + x7 * y1) + 38 * (x9 * y9);
+
+			xy.N8 = t & ((1 << 26) - 1);
+			t = (t >> 26) + x0 * y9 + x1 * y8 + x2 * y7 + x3 * y6 + x4 * y5 + x5 * y4 + x6 * y3 + x7 * y2 + x8 * y1 + x9 * y0;
+			xy.N9 = t & ((1 << 25) - 1);
+			t = x0 * y0 + 19 * ((t >> 25) + x2 * y8 + x4 * y6 + x6 * y4 + x8 * y2) + 38 * (x1 * y9 + x3 * y7 + x5 * y5 + x7 * y3 + x9 * y1);
+			xy.N0 = t & ((1 << 26) - 1);
+			t = (t >> 26) + x0 * y1 + x1 * y0 + 19 * (x2 * y9 + x3 * y8 + x4 * y7 + x5 * y6 + x6 * y5 + x7 * y4 + x8 * y3 + x9 * y2);
+			xy.N1 = t & ((1 << 25) - 1);
+			t = (t >> 25) + x0 * y2 + x2 * y0 + 19 * (x4 * y8 + x6 * y6 + x8 * y4) + 2 * (x1 * y1) + 38 * (x3 * y9 + x5 * y7 + x7 * y5 + x9 * y3);
+			xy.N2 = t & ((1 << 26) - 1);
+			t = (t >> 26) + x0 * y3 + x1 * y2 + x2 * y1 + x3 * y0 + 19 * (x4 * y9 + x5 * y8 + x6 * y7 + x7 * y6 + x8 * y5 + x9 * y4);
+			xy.N3 = t & ((1 << 25) - 1);
+			t = (t >> 25) + x0 * y4 + x2 * y2 + x4 * y0 + 19 * (x6 * y8 + x8 * y6) + 2 * (x1 * y3 + x3 * y1) + 38 * (x5 * y9 + x7 * y7 + x9 * y5);
+			xy.N4 = t & ((1 << 26) - 1);
+			t = (t >> 26) + x0 * y5 + x1 * y4 + x2 * y3 + x3 * y2 + x4 * y1 + x5 * y0 + 19 * (x6 * y9 + x7 * y8 + x8 * y7 + x9 * y6);
+			xy.N5 = t & ((1 << 25) - 1);
+			t = (t >> 25) + x0 * y6 + x2 * y4 + x4 * y2 + x6 * y0 + 19 * (x8 * y8) + 2 * (x1 * y5 + x3 * y3 + x5 * y1) + 38 * (x7 * y9 + x9 * y7);
+			xy.N6 = t & ((1 << 26) - 1);
+			t = (t >> 26) + x0 * y7 + x1 * y6 + x2 * y5 + x3 * y4 + x4 * y3 + x5 * y2 + x6 * y1 + x7 * y0 + 19 * (x8 * y9 + x9 * y8);
+			xy.N7 = t & ((1 << 25) - 1);
 			t = (t >> 25) + xy.N8;
-			xy.N8 = (t & ((1 << 26) - 1));
-			xy.N9 += (t >> 26);
+			xy.N8 = t & ((1 << 26) - 1);
+			xy.N9 += t >> 26;
 		}
 
 		/// <summary>
@@ -580,55 +518,34 @@ namespace Elliptic
 		static void Square(Long10 xsqr, Long10 x)
 		{
 			long
-				x0 = x.N0,
-				x1 = x.N1,
-				x2 = x.N2,
-				x3 = x.N3,
-				x4 = x.N4,
-				x5 = x.N5,
-				x6 = x.N6,
-				x7 = x.N7,
-				x8 = x.N8,
-				x9 = x.N9;
+				x0 = x.N0, x1 = x.N1, x2 = x.N2, x3 = x.N3, x4 = x.N4,
+				x5 = x.N5, x6 = x.N6, x7 = x.N7, x8 = x.N8, x9 = x.N9;
 
-			long t = (x4 * x4) + 2 * ((x0 * x8) + (x2 * x6)) + 38 *
-					 (x9 * x9) + 4 * ((x1 * x7) + (x3 * x5));
+			long t = x4 * x4 + 2 * (x0 * x8 + x2 * x6) + 38 *
+					 (x9 * x9) + 4 * (x1 * x7 + x3 * x5);
 
-			xsqr.N8 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + 2 * ((x0 * x9) + (x1 * x8) + (x2 * x7) +
-							   (x3 * x6) + (x4 * x5));
-			xsqr.N9 = (t & ((1 << 25) - 1));
-			t = 19 * (t >> 25) + (x0 * x0) + 38 * ((x2 * x8) +
-											   (x4 * x6) + (x5 * x5)) + 76 * ((x1 * x9)
-																			+ (x3 * x7));
-			xsqr.N0 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + 2 * (x0 * x1) + 38 * ((x2 * x9) +
-											  (x3 * x8) + (x4 * x7) + (x5 * x6));
-			xsqr.N1 = (t & ((1 << 25) - 1));
-			t = (t >> 25) + 19 * (x6 * x6) + 2 * ((x0 * x2) +
-											  (x1 * x1)) + 38 * (x4 * x8) + 76 *
-				((x3 * x9) + (x5 * x7));
-			xsqr.N2 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + 2 * ((x0 * x3) + (x1 * x2)) + 38 *
-				((x4 * x9) + (x5 * x8) + (x6 * x7));
-			xsqr.N3 = (t & ((1 << 25) - 1));
-			t = (t >> 25) + (x2 * x2) + 2 * (x0 * x4) + 38 *
-				((x6 * x8) + (x7 * x7)) + 4 * (x1 * x3) + 76 *
-				(x5 * x9);
-			xsqr.N4 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + 2 * ((x0 * x5) + (x1 * x4) + (x2 * x3))
-				+ 38 * ((x6 * x9) + (x7 * x8));
-			xsqr.N5 = (t & ((1 << 25) - 1));
-			t = (t >> 25) + 19 * (x8 * x8) + 2 * ((x0 * x6) +
-											  (x2 * x4) + (x3 * x3)) + 4 * (x1 * x5) +
-				76 * (x7 * x9);
-			xsqr.N6 = (t & ((1 << 26) - 1));
-			t = (t >> 26) + 2 * ((x0 * x7) + (x1 * x6) + (x2 * x5) +
-							   (x3 * x4)) + 38 * (x8 * x9);
-			xsqr.N7 = (t & ((1 << 25) - 1));
+			xsqr.N8 = t & ((1 << 26) - 1);
+			t = (t >> 26) + 2 * (x0 * x9 + x1 * x8 + x2 * x7 + x3 * x6 + x4 * x5);
+			xsqr.N9 = t & ((1 << 25) - 1);
+			t = 19 * (t >> 25) + x0 * x0 + 38 * (x2 * x8 + x4 * x6 + x5 * x5) + 76 * (x1 * x9 + x3 * x7);
+			xsqr.N0 = t & ((1 << 26) - 1);
+			t = (t >> 26) + 2 * (x0 * x1) + 38 * (x2 * x9 + x3 * x8 + x4 * x7 + x5 * x6);
+			xsqr.N1 = t & ((1 << 25) - 1);
+			t = (t >> 25) + 19 * (x6 * x6) + 2 * (x0 * x2 + x1 * x1) + 38 * (x4 * x8) + 76 * (x3 * x9 + x5 * x7);
+			xsqr.N2 = t & ((1 << 26) - 1);
+			t = (t >> 26) + 2 * (x0 * x3 + x1 * x2) + 38 * (x4 * x9 + x5 * x8 + x6 * x7);
+			xsqr.N3 = t & ((1 << 25) - 1);
+			t = (t >> 25) + x2 * x2 + 2 * (x0 * x4) + 38 * (x6 * x8 + x7 * x7) + 4 * (x1 * x3) + 76 * (x5 * x9);
+			xsqr.N4 = t & ((1 << 26) - 1);
+			t = (t >> 26) + 2 * (x0 * x5 + x1 * x4 + x2 * x3) + 38 * (x6 * x9 + x7 * x8);
+			xsqr.N5 = t & ((1 << 25) - 1);
+			t = (t >> 25) + 19 * (x8 * x8) + 2 * (x0 * x6 + x2 * x4 + x3 * x3) + 4 * (x1 * x5) + 76 * (x7 * x9);
+			xsqr.N6 = t & ((1 << 26) - 1);
+			t = (t >> 26) + 2 * (x0 * x7 + x1 * x6 + x2 * x5 + x3 * x4) + 38 * (x8 * x9);
+			xsqr.N7 = t & ((1 << 25) - 1);
 			t = (t >> 25) + xsqr.N8;
-			xsqr.N8 = (t & ((1 << 26) - 1));
-			xsqr.N9 += (t >> 26);
+			xsqr.N8 = t & ((1 << 26) - 1);
+			xsqr.N9 += t >> 26;
 		}
 
 		/// <summary>
@@ -646,76 +563,76 @@ namespace Elliptic
 				t4 = new Long10();
 			int i;
 			/* the chain for x^(2^255-21) is straight from djb's implementation */
-			Square(t1, x); /*  2 == 2 * 1	*/
-			Square(t2, t1); /*  4 == 2 * 2	*/
-			Square(t0, t2); /*  8 == 2 * 4	*/
-			Multiply(t2, t0, x); /*  9 == 8 + 1	*/
-			Multiply(t0, t2, t1); /* 11 == 9 + 2	*/
-			Square(t1, t0); /* 22 == 2 * 11	*/
-			Multiply(t3, t1, t2); /* 31 == 22 + 9
-					== 2^5   - 2^0	*/
-			Square(t1, t3); /* 2^6   - 2^1	*/
-			Square(t2, t1); /* 2^7   - 2^2	*/
-			Square(t1, t2); /* 2^8   - 2^3	*/
-			Square(t2, t1); /* 2^9   - 2^4	*/
-			Square(t1, t2); /* 2^10  - 2^5	*/
-			Multiply(t2, t1, t3); /* 2^10  - 2^0	*/
-			Square(t1, t2); /* 2^11  - 2^1	*/
-			Square(t3, t1); /* 2^12  - 2^2	*/
+			Square(t1, x);        //  2 == 2 * 1	
+			Square(t2, t1);       //  4 == 2 * 2	
+			Square(t0, t2);       //  8 == 2 * 4	
+			Multiply(t2, t0, x);  //  9 == 8 + 1	
+			Multiply(t0, t2, t1); // 11 == 9 + 2	
+			Square(t1, t0);       // 22 == 2 * 11	
+			Multiply(t3, t1, t2); // 31 == 22 + 9
+								  // == 2^5   - 2^0	
+			Square(t1, t3);       // 2^6   - 2^1	
+			Square(t2, t1);       // 2^7   - 2^2	
+			Square(t1, t2);       // 2^8   - 2^3	
+			Square(t2, t1);       // 2^9   - 2^4	
+			Square(t1, t2);       // 2^10  - 2^5	
+			Multiply(t2, t1, t3); // 2^10  - 2^0	
+			Square(t1, t2);       // 2^11  - 2^1	
+			Square(t3, t1);       // 2^12  - 2^2	
 			for (i = 1; i < 5; i++)
 			{
 				Square(t1, t3);
 				Square(t3, t1);
-			} /* t3 */ /* 2^20  - 2^10	*/
-			Multiply(t1, t3, t2); /* 2^20  - 2^0	*/
-			Square(t3, t1); /* 2^21  - 2^1	*/
-			Square(t4, t3); /* 2^22  - 2^2	*/
+			} // t3  // 2^20  - 2^10	
+			Multiply(t1, t3, t2); // 2^20  - 2^0	
+			Square(t3, t1); // 2^21  - 2^1	
+			Square(t4, t3); // 2^22  - 2^2	
 			for (i = 1; i < 10; i++)
 			{
 				Square(t3, t4);
 				Square(t4, t3);
-			} /* t4 */ /* 2^40  - 2^20	*/
-			Multiply(t3, t4, t1); /* 2^40  - 2^0	*/
+			} // t4  // 2^40  - 2^20	
+			Multiply(t3, t4, t1); // 2^40  - 2^0	
 			for (i = 0; i < 5; i++)
 			{
 				Square(t1, t3);
 				Square(t3, t1);
-			} /* t3 */ /* 2^50  - 2^10	*/
-			Multiply(t1, t3, t2); /* 2^50  - 2^0	*/
-			Square(t2, t1); /* 2^51  - 2^1	*/
-			Square(t3, t2); /* 2^52  - 2^2	*/
+			} // t3  // 2^50  - 2^10	
+			Multiply(t1, t3, t2); // 2^50  - 2^0	
+			Square(t2, t1); // 2^51  - 2^1	
+			Square(t3, t2); // 2^52  - 2^2	
 			for (i = 1; i < 25; i++)
 			{
 				Square(t2, t3);
 				Square(t3, t2);
-			} /* t3 */ /* 2^100 - 2^50 */
-			Multiply(t2, t3, t1); /* 2^100 - 2^0	*/
-			Square(t3, t2); /* 2^101 - 2^1	*/
-			Square(t4, t3); /* 2^102 - 2^2	*/
+			} // t3  // 2^100 - 2^50 
+			Multiply(t2, t3, t1); // 2^100 - 2^0	
+			Square(t3, t2); // 2^101 - 2^1	
+			Square(t4, t3); // 2^102 - 2^2	
 			for (i = 1; i < 50; i++)
 			{
 				Square(t3, t4);
 				Square(t4, t3);
-			} /* t4 */ /* 2^200 - 2^100 */
-			Multiply(t3, t4, t2); /* 2^200 - 2^0	*/
+			} // t4  // 2^200 - 2^100 
+			Multiply(t3, t4, t2); // 2^200 - 2^0	
 			for (i = 0; i < 25; i++)
 			{
 				Square(t4, t3);
 				Square(t3, t4);
-			} /* t3 */ /* 2^250 - 2^50	*/
-			Multiply(t2, t3, t1); /* 2^250 - 2^0	*/
-			Square(t1, t2); /* 2^251 - 2^1	*/
-			Square(t2, t1); /* 2^252 - 2^2	*/
+			} // t3  // 2^250 - 2^50	
+			Multiply(t2, t3, t1); // 2^250 - 2^0	
+			Square(t1, t2); // 2^251 - 2^1	
+			Square(t2, t1); // 2^252 - 2^2	
 			if (sqrtAssist)
 			{
-				Multiply(y, x, t2); /* 2^252 - 3 */
+				Multiply(y, x, t2); // 2^252 - 3 
 			}
 			else
 			{
-				Square(t1, t2); /* 2^253 - 2^3	*/
-				Square(t2, t1); /* 2^254 - 2^4	*/
-				Square(t1, t2); /* 2^255 - 2^5	*/
-				Multiply(y, t1, t0); /* 2^255 - 21	*/
+				Square(t1, t2); // 2^253 - 2^3	
+				Square(t2, t1); // 2^254 - 2^4	
+				Square(t1, t2); // 2^255 - 2^5	
+				Multiply(y, t1, t0); // 2^255 - 21	
 			}
 		}
 
@@ -723,10 +640,7 @@ namespace Elliptic
 		/// Checks if x is "negative", requires reduced input
 		/// </summary>
 		/// <param name="x">must be reduced input</param>
-		static int IsNegative(Long10 x)
-		{
-			return (int)(((IsOverflow(x) | (x.N9 < 0)) ? 1 : 0) ^ (x.N0 & 1));
-		}
+		static int IsNegative(Long10 x) => (int)(((IsOverflow(x) | (x.N9 < 0)) ? 1 : 0) ^ (x.N0 & 1));
 
 		/********************* Elliptic curve *********************/
 
@@ -793,17 +707,17 @@ namespace Elliptic
 		/// <summary>
 		/// P = kG   and  s = sign(P)/k
 		/// </summary>
-		static void Core(byte[] publicKey, byte[] signingKey, byte[] privateKey, byte[] peerPublicKey)
+		static void Core(byte[] publicKey, byte[]? signingKey, byte[] privateKey, byte[]? peerPublicKey)
 		{
 			if (publicKey == null) throw new ArgumentNullException("publicKey");
-			if (publicKey.Length != 32) throw new ArgumentException(String.Format("publicKey must be 32 bytes long (but was {0} bytes long)", publicKey.Length), "publicKey");
+			if (publicKey.Length != 32) throw new ArgumentException($"publicKey must be 32 bytes long (but was {publicKey.Length} bytes long)", "publicKey");
 
-			if (signingKey != null && signingKey.Length != 32) throw new ArgumentException(String.Format("signingKey must be null or 32 bytes long (but was {0} bytes long)", signingKey.Length), "signingKey");
+			if (signingKey != null && signingKey.Length != 32) throw new ArgumentException($"signingKey must be null or 32 bytes long (but was {signingKey.Length} bytes long)", "signingKey");
 
 			if (privateKey == null) throw new ArgumentNullException("privateKey");
-			if (privateKey.Length != 32) throw new ArgumentException(String.Format("privateKey must be 32 bytes long (but was {0} bytes long)", privateKey.Length), "privateKey");
+			if (privateKey.Length != 32) throw new ArgumentException($"privateKey must be 32 bytes long (but was {privateKey.Length} bytes long)", "privateKey");
 
-			if (peerPublicKey != null && peerPublicKey.Length != 32) throw new ArgumentException(String.Format("peerPublicKey must be null or 32 bytes long (but was {0} bytes long)", peerPublicKey.Length), "peerPublicKey");
+			if (peerPublicKey != null && peerPublicKey.Length != 32) throw new ArgumentException($"peerPublicKey must be null or 32 bytes long (but was {peerPublicKey.Length} bytes long)", "peerPublicKey");
 
 			Long10
 				dx = new Long10(),
@@ -829,9 +743,9 @@ namespace Elliptic
 			Copy(x[1], dx);
 			Set(z[1], 1);
 
-			for (int i = 32; i-- != 0; )
+			for (int i = 32; i-- != 0;)
 			{
-				for (int j = 8; j-- != 0; )
+				for (int j = 8; j-- != 0;)
 				{
 					/* swap arguments depending on bit */
 					int bit1 = (privateKey[i] & 0xFF) >> j & 1;
@@ -857,20 +771,21 @@ namespace Elliptic
 			/* calculate s such that s abs(P) = G  .. assumes G is std base point */
 			if (signingKey != null)
 			{
-				CurveEquationInline(t1, dx, t2); /* t1 = Py^2  */
-				Reciprocal(t3, z[1], false); /* where Q=P+G ... */
-				Multiply(t2, x[1], t3); /* t2 = Qx  */
-				Add(t2, t2, dx); /* t2 = Qx + Px  */
-				t2.N0 += 9 + 486662; /* t2 = Qx + Px + Gx + 486662  */
-				dx.N0 -= 9; /* dx = Px - Gx  */
-				Square(t3, dx); /* t3 = (Px - Gx)^2  */
-				Multiply(dx, t2, t3); /* dx = t2 (Px - Gx)^2  */
-				Sub(dx, dx, t1); /* dx = t2 (Px - Gx)^2 - Py^2  */
-				dx.N0 -= 39420360; /* dx = t2 (Px - Gx)^2 - Py^2 - Gy^2  */
-				Multiply(t1, dx, BaseR2Y); /* t1 = -Py  */
-				if (IsNegative(t1) != 0) /* sign is 1, so just copy  */
+				CurveEquationInline(t1, dx, t2); // t1 = Py^2  
+				Reciprocal(t3, z[1], false);     // where Q=P+G ... 
+				Multiply(t2, x[1], t3);          // t2 = Qx  
+				Add(t2, t2, dx);                 // t2 = Qx + Px  
+				t2.N0 += 9 + 486662;             // t2 = Qx + Px + Gx + 486662  
+				dx.N0 -= 9;                      // dx = Px - Gx  
+				Square(t3, dx);                  // t3 = (Px - Gx)^2  
+				Multiply(dx, t2, t3);            // dx = t2 (Px - Gx)^2  
+				Sub(dx, dx, t1);                 // dx = t2 (Px - Gx)^2 - Py^2  
+				dx.N0 -= 39420360;               // dx = t2 (Px - Gx)^2 - Py^2 - Gy^2  
+				Multiply(t1, dx, BaseR2Y);       // t1 = -Py  
+
+				if (IsNegative(t1) != 0) // sign is 1, so just copy  
 					Copy32(privateKey, signingKey);
-				else /* sign is -1, so negate  */
+				else                     // sign is -1, so negate  
 					MultiplyArraySmall(signingKey, OrderTimes8, 0, privateKey, 32, -1);
 
 				/* reduce s mod q
